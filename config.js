@@ -21,8 +21,8 @@ export const SETTINGS = {
   location: "Bukit Katil, Melaka",     // boleh kosongkan ""
   rateWeekday: 220,                   // malam Isnin – Khamis (RM)
   rateWeekend: 250,                   // malam Jumaat, Sabtu, Ahad & cuti umum (RM)
-  maxGuests: 10,                      // had bilangan tetamu
-  maxNights: 14,                      // had malam bagi satu tempahan online
+  maxGuests: 14,                      // had bilangan tetamu
+  maxNights: 30,                      // had malam bagi satu tempahan online
   whatsappNumber: "60133382348",      // nombor WhatsApp admin, format 60xxxxxxxxx (tanpa +)
   checkInTime: "2:00 petang",
   checkOutTime: "12:00 tengah hari",
