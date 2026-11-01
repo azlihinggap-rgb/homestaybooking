@@ -17,7 +17,28 @@
 
   <!-- BORANG TEMPAHAN -->
   <div id="bookingView">
+    <!-- GALERI -->
+    <div class="gallery hidden" id="gallery"></div>
+
+    <!-- KEMUDAHAN -->
+    <div class="card" id="amenCard">
+      <h2>Kemudahan</h2>
+      <ul class="amen" id="amenList"></ul>
+    </div>
+
+    <!-- LOKASI -->
     <div class="card">
+      <h2>Lokasi</h2>
+      <div class="map"><iframe id="mapFrame" title="Peta lokasi" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe></div>
+      <div class="bk-actions">
+        <a class="btn sm" id="gmapsBtn" target="_blank" rel="noopener">Google Maps</a>
+        <a class="btn sm ghost" id="wazeBtn" target="_blank" rel="noopener">Waze</a>
+      </div>
+      <h2 style="margin-top:16px">Berdekatan</h2>
+      <div id="nearby"></div>
+    </div>
+
+    <div class="card" id="rateCard">
       <h2>Kadar semalam</h2>
       <div class="rates">
         <div class="rate">Isnin – Khamis<b id="rateWd">RM220</b></div>
@@ -26,7 +47,7 @@
       <p class="muted" id="times" style="margin:10px 0 0"></p>
     </div>
 
-    <div class="card">
+    <div class="card" id="calCard">
       <h2>1. Pilih tarikh</h2>
       <p class="muted" id="hint" style="margin:0 0 10px">Tekan tarikh <b>check-in</b>, kemudian tarikh <b>check-out</b>.</p>
       <div class="cal-nav">
@@ -68,14 +89,113 @@
   </div>
 </div>
 
+<!-- Butang terapung "Semak tarikh" -->
+<button class="btn fab" id="fab" type="button">📅 Semak tarikh &amp; tempah</button>
+
+<!-- Paparan gambar penuh -->
+<div class="lightbox hidden" id="lightbox">
+  <button class="lb-close" id="lbClose" aria-label="Tutup">✕</button>
+  <button class="lb-nav lb-prev" id="lbPrev" aria-label="Sebelum">‹</button>
+  <img id="lbImg" alt="" />
+  <button class="lb-nav lb-next" id="lbNext" aria-label="Seterusnya">›</button>
+  <div class="lb-cap" id="lbCap"></div>
+</div>
+
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
   import { getFirestore, collection, getDocs, doc, getDoc, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-  import { firebaseConfig, SETTINGS as S } from "./config.js";
-  import { toKey, fromKey, addDays, nightsBetween, isPremium, rateFor, quote, MONTHS, fmtDate, rm, renderMonth, waNumber } from "./common.js";
+  import { firebaseConfig, SETTINGS as S, GALLERY, AMENITIES, LOCATION, NEARBY } from "./config.js";
+  import { toKey, nightsBetween, isPremium, rateFor, quote, MONTHS, fmtDate, rm, renderMonth, waNumber, esc } from "./common.js";
 
   const db = getFirestore(initializeApp(firebaseConfig));
   const $ = (id) => document.getElementById(id);
+
+  // ---------- Galeri ----------
+  const shots = [];
+  (function buildGallery() {
+    const box = $("gallery");
+    GALLERY.forEach((g) => {
+      const fig = document.createElement("figure");
+      const img = new Image(); // dimuatkan terus (bukan lazy) supaya gambar yang tiada dapat dikesan
+      img.alt = g.caption || "";
+      img.src = g.src;
+      img.onload = () => {
+        shots.push(g);
+        shots.sort((a, b) => GALLERY.indexOf(a) - GALLERY.indexOf(b));
+        box.classList.remove("hidden");
+      };
+      img.onerror = () => fig.remove(); // gambar belum diupload → sembunyi
+      img.onclick = () => openLb(shots.indexOf(g));
+      fig.appendChild(img);
+      if (g.caption) {
+        const c = document.createElement("figcaption");
+        c.textContent = g.caption;
+        fig.appendChild(c);
+      }
+      box.appendChild(fig);
+    });
+  })();
+
+  let lbIdx = 0;
+  function openLb(i) {
+    if (i < 0) return;
+    lbIdx = i;
+    $("lbImg").src = shots[i].src;
+    $("lbImg").alt = shots[i].caption || "";
+    $("lbCap").textContent = `${shots[i].caption || ""}  (${i + 1}/${shots.length})`;
+    $("lightbox").classList.remove("hidden");
+    document.body.style.overflow = "hidden";
+  }
+  const closeLb = () => { $("lightbox").classList.add("hidden"); document.body.style.overflow = ""; };
+  const stepLb = (d) => openLb((lbIdx + d + shots.length) % shots.length);
+  $("lbClose").onclick = closeLb;
+  $("lbPrev").onclick = () => stepLb(-1);
+  $("lbNext").onclick = () => stepLb(1);
+  $("lightbox").addEventListener("click", (e) => { if (e.target.id === "lightbox") closeLb(); });
+  document.addEventListener("keydown", (e) => {
+    if ($("lightbox").classList.contains("hidden")) return;
+    if (e.key === "Escape") closeLb();
+    if (e.key === "ArrowLeft") stepLb(-1);
+    if (e.key === "ArrowRight") stepLb(1);
+  });
+  // Swipe kiri/kanan pada telefon
+  let tx = null;
+  $("lightbox").addEventListener("touchstart", (e) => { tx = e.touches[0].clientX; }, { passive: true });
+  $("lightbox").addEventListener("touchend", (e) => {
+    if (tx == null) return;
+    const dx = e.changedTouches[0].clientX - tx;
+    if (Math.abs(dx) > 50) stepLb(dx < 0 ? 1 : -1);
+    tx = null;
+  });
+
+  // ---------- Kemudahan ----------
+  if (AMENITIES.length) {
+    $("amenList").innerHTML = AMENITIES.map((a) => `<li><span>${esc(a.icon || "•")}</span>${esc(a.text)}</li>`).join("");
+  } else {
+    $("amenCard").classList.add("hidden");
+  }
+
+  // ---------- Lokasi ----------
+  const ll = `${LOCATION.lat},${LOCATION.lng}`;
+  $("mapFrame").src = `https://maps.google.com/maps?q=${ll}&z=15&output=embed`;
+  $("gmapsBtn").href = LOCATION.googleMapsUrl || `https://www.google.com/maps/search/?api=1&query=${ll}`;
+  $("wazeBtn").href = `https://waze.com/ul?ll=${ll}&navigate=yes`;
+  $("nearby").innerHTML = NEARBY.map((p) => `
+    <a class="poi" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.query || p.name)}">
+      <span class="poi-icon">${esc(p.icon || "📍")}</span>
+      <span class="poi-body"><b>${esc(p.name)}</b>${p.note ? `<span class="muted">${esc(p.note)}</span>` : ""}</span>
+      <span class="poi-dist">${esc(p.distance || "")}</span>
+    </a>`).join("");
+
+  // ---------- Butang terapung ----------
+  $("fab").onclick = () => $("calCard").scrollIntoView({ behavior: "smooth", block: "start" });
+  const visible = new Set();
+  const fabObs = new IntersectionObserver((entries) => {
+    entries.forEach((e) => (e.isIntersecting ? visible.add(e.target.id) : visible.delete(e.target.id)));
+    $("fab").classList.toggle("hidden", visible.size > 0 || !$("doneView").classList.contains("hidden"));
+  });
+  fabObs.observe($("calCard"));
+  fabObs.observe($("form"));
 
   // Paparan asas
   document.title = `Tempahan ${S.homestayName}`;
@@ -206,6 +326,7 @@
       $("waBtn").href = `https://wa.me/${waNumber(S.whatsappNumber)}?text=${encodeURIComponent(msg)}`;
       $("bookingView").classList.add("hidden");
       $("doneView").classList.remove("hidden");
+      $("fab").classList.add("hidden");
       window.scrollTo(0, 0);
     } catch (ex) {
       console.error(ex);
