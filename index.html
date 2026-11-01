@@ -18,7 +18,13 @@
   <!-- BORANG TEMPAHAN -->
   <div id="bookingView">
     <!-- GALERI -->
-    <div class="gallery hidden" id="gallery"></div>
+    <div class="carousel hidden" id="carousel">
+      <div class="gallery" id="gallery"></div>
+      <button class="car-nav car-prev" id="carPrev" type="button" aria-label="Gambar sebelum">‹</button>
+      <button class="car-nav car-next" id="carNext" type="button" aria-label="Gambar seterusnya">›</button>
+      <div class="car-count" id="carCount"></div>
+      <div class="car-dots" id="carDots"></div>
+    </div>
 
     <!-- KEMUDAHAN -->
     <div class="card" id="amenCard">
@@ -112,19 +118,52 @@
 
   // ---------- Galeri ----------
   const shots = [];
+  const track = $("gallery");
+  const slides = () => [...track.children];
+  const curSlide = () => Math.round(track.scrollLeft / Math.max(1, track.clientWidth));
+  let pos = 0; // gambar sasaran semasa (elak tersasar bila tekan laju-laju)
+
+  function goSlide(i, smooth = true) {
+    const n = slides().length;
+    if (!n) return;
+    i = (i + n) % n; // gambar terakhir → kembali ke gambar pertama
+    pos = i;
+    track.scrollTo({ left: i * track.clientWidth, behavior: smooth ? "smooth" : "auto" });
+  }
+
+  function updateCarousel() {
+    const n = slides().length;
+    $("carousel").classList.toggle("hidden", shots.length === 0);
+    $("carousel").classList.toggle("single", n <= 1);
+    const i = Math.max(0, Math.min(pos, n - 1));
+    $("carCount").textContent = n ? `${i + 1} / ${n}` : "";
+    const dots = $("carDots");
+    if (dots.children.length !== n) {
+      dots.innerHTML = "";
+      for (let k = 0; k < n; k++) {
+        const d = document.createElement("button");
+        d.type = "button";
+        d.setAttribute("aria-label", `Gambar ${k + 1}`);
+        d.onclick = () => { stopAuto(); goSlide(k); updateCarousel(); };
+        dots.appendChild(d);
+      }
+    }
+    [...dots.children].forEach((d, k) => d.classList.toggle("on", k === i));
+  }
+
   (function buildGallery() {
-    const box = $("gallery");
     GALLERY.forEach((g) => {
       const fig = document.createElement("figure");
       const img = new Image(); // dimuatkan terus (bukan lazy) supaya gambar yang tiada dapat dikesan
       img.alt = g.caption || "";
+      img.decoding = "async";
       img.src = g.src;
       img.onload = () => {
         shots.push(g);
         shots.sort((a, b) => GALLERY.indexOf(a) - GALLERY.indexOf(b));
-        box.classList.remove("hidden");
+        updateCarousel();
       };
-      img.onerror = () => fig.remove(); // gambar belum diupload → sembunyi
+      img.onerror = () => { fig.remove(); updateCarousel(); }; // gambar belum diupload → sembunyi
       img.onclick = () => openLb(shots.indexOf(g));
       fig.appendChild(img);
       if (g.caption) {
@@ -132,9 +171,27 @@
         c.textContent = g.caption;
         fig.appendChild(c);
       }
-      box.appendChild(fig);
+      track.appendChild(fig);
     });
   })();
+
+  let scrollT;
+  track.addEventListener("scroll", () => {
+    clearTimeout(scrollT);
+    scrollT = setTimeout(() => { pos = curSlide(); updateCarousel(); }, 120); // selepas swipe berhenti
+  }, { passive: true });
+  window.addEventListener("resize", () => goSlide(pos, false));
+  $("carPrev").onclick = () => { stopAuto(); goSlide(pos - 1); updateCarousel(); };
+  $("carNext").onclick = () => { stopAuto(); goSlide(pos + 1); updateCarousel(); };
+
+  // Tukar gambar automatik setiap 5 saat; berhenti bila pelawat sentuh / tekan galeri
+  let autoT = setInterval(() => {
+    if (document.hidden || !$("lightbox").classList.contains("hidden")) return;
+    const r = track.getBoundingClientRect();
+    if (r.bottom > 0 && r.top < innerHeight) { goSlide(pos + 1); updateCarousel(); }
+  }, 5000);
+  function stopAuto() { clearInterval(autoT); autoT = null; }
+  ["touchstart", "wheel", "mousedown"].forEach((ev) => track.addEventListener(ev, stopAuto, { passive: true }));
 
   let lbIdx = 0;
   function openLb(i) {

@@ -89,13 +89,23 @@ textarea { min-height: 60px; resize: vertical; }
 .ok-icon { font-size: 2.4rem; }
 
 /* ---------- Galeri ---------- */
-.gallery { display: flex; gap: 8px; overflow-x: auto; scroll-snap-type: x mandatory; margin: 0 -16px 14px; padding: 0 16px; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+/* Satu gambar penuh setiap kali, saiz seragam, swipe/scroll lancar */
+.carousel { position: relative; margin-bottom: 14px; border-radius: var(--radius); overflow: hidden; background: #222; aspect-ratio: 4 / 3; }
+@media (min-width: 640px) { .carousel { aspect-ratio: 16 / 9; } }
+.gallery { display: flex; height: 100%; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; scroll-behavior: smooth; -webkit-overflow-scrolling: touch; scrollbar-width: none; overscroll-behavior-x: contain; }
 .gallery::-webkit-scrollbar { display: none; }
-.gallery figure { margin: 0; flex: 0 0 85%; scroll-snap-align: center; position: relative; border-radius: var(--radius); overflow: hidden; background: var(--line); }
-.gallery figure:first-child { flex-basis: 92%; }
-.gallery img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; cursor: zoom-in; }
-.gallery figcaption { position: absolute; left: 8px; bottom: 8px; background: rgba(0,0,0,.55); color: #fff; font-size: .78rem; padding: 3px 9px; border-radius: 999px; }
-@media (min-width: 640px) { .gallery figure { flex-basis: 48%; } .gallery figure:first-child { flex-basis: 60%; } }
+.gallery figure { margin: 0; flex: 0 0 100%; height: 100%; scroll-snap-align: start; scroll-snap-stop: always; position: relative; }
+.gallery img { display: block; width: 100%; height: 100%; object-fit: cover; cursor: zoom-in; user-select: none; -webkit-user-drag: none; }
+.gallery figcaption { position: absolute; left: 12px; bottom: 34px; background: rgba(0,0,0,.55); color: #fff; font-size: .8rem; padding: 4px 10px; border-radius: 999px; pointer-events: none; }
+.car-nav { position: absolute; top: 50%; transform: translateY(-50%); width: 40px; height: 40px; border-radius: 50%; border: 0; background: rgba(255,255,255,.85); color: var(--ink); font-size: 1.4rem; line-height: 1; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,.25); opacity: .9; }
+.car-nav:hover { opacity: 1; }
+.car-prev { left: 10px; } .car-next { right: 10px; }
+.car-count { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,.55); color: #fff; font-size: .75rem; padding: 3px 9px; border-radius: 999px; pointer-events: none; }
+.car-dots { position: absolute; left: 0; right: 0; bottom: 12px; display: flex; justify-content: center; gap: 6px; pointer-events: none; }
+.car-dots button { pointer-events: auto; width: 7px; height: 7px; padding: 0; border: 0; border-radius: 999px; background: rgba(255,255,255,.55); cursor: pointer; transition: width .2s, background .2s; }
+.car-dots button.on { width: 20px; background: #fff; }
+.carousel.single .car-nav, .carousel.single .car-dots, .carousel.single .car-count { display: none; }
+@media (hover: none) { .car-nav { width: 34px; height: 34px; font-size: 1.2rem; background: rgba(255,255,255,.7); } }
 
 .lightbox { position: fixed; inset: 0; background: rgba(0,0,0,.92); z-index: 100; display: flex; align-items: center; justify-content: center; }
 .lightbox img { max-width: 100%; max-height: 82vh; object-fit: contain; }
