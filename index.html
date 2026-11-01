@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="ms">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Tempahan Homestay</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div>
+      <h1 id="hsName">Homestay</h1>
+      <div class="muted" id="hsLoc"></div>
+    </div>
+  </div>
+
+  <!-- BORANG TEMPAHAN -->
+  <div id="bookingView">
+    <div class="card">
+      <h2>Kadar semalam</h2>
+      <div class="rates">
+        <div class="rate">Isnin – Khamis<b id="rateWd">RM220</b></div>
+        <div class="rate prem">Jumaat – Ahad &amp; cuti umum<b id="rateWe">RM250</b></div>
+      </div>
+      <p class="muted" id="times" style="margin:10px 0 0"></p>
+    </div>
+
+    <div class="card">
+      <h2>1. Pilih tarikh</h2>
+      <p class="muted" id="hint" style="margin:0 0 10px">Tekan tarikh <b>check-in</b>, kemudian tarikh <b>check-out</b>.</p>
+      <div class="cal-nav">
+        <button class="icon-btn" id="prev" aria-label="Bulan sebelum">‹</button>
+        <strong id="monthLabel"></strong>
+        <button class="icon-btn" id="next" aria-label="Bulan seterusnya">›</button>
+      </div>
+      <div id="cal"><p class="muted">Memuatkan kalendar…</p></div>
+      <div class="legend">
+        <span><i style="background:#fff"></i>Kosong</span>
+        <span><i style="background:var(--premium)"></i>Kadar hujung minggu / cuti</span>
+        <span><i style="background:var(--booked)"></i>Penuh</span>
+        <span><i style="background:var(--brand)"></i>Pilihan anda</span>
+      </div>
+      <div class="summary hidden" id="summary"></div>
+    </div>
+
+    <form class="card" id="form" novalidate>
+      <h2>2. Maklumat anda</h2>
+      <label for="name">Nama penuh</label>
+      <input id="name" autocomplete="name" maxlength="100" required />
+      <label for="phone">No. telefon (WhatsApp)</label>
+      <input id="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="012-345 6789" maxlength="20" required />
+      <label for="guests">Bilangan tetamu</label>
+      <select id="guests"></select>
+      <div class="err hidden" id="formErr"></div>
+      <button class="btn block" id="submit" type="submit">Hantar tempahan</button>
+      <p class="muted" style="margin:10px 0 0;font-size:.8rem">Tempahan akan disahkan oleh tuan rumah. Harga akhir mungkin berbeza dan akan dimaklumkan semasa pengesahan.</p>
+    </form>
+  </div>
+
+  <!-- BERJAYA -->
+  <div id="doneView" class="card center hidden">
+    <div class="ok-icon">✅</div>
+    <h2>Tempahan dihantar!</h2>
+    <p id="doneText"></p>
+    <a class="btn wa block" id="waBtn" target="_blank" rel="noopener">Maklumkan melalui WhatsApp</a>
+    <button class="btn ghost block" id="again" type="button">Buat tempahan lain</button>
+  </div>
+</div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getFirestore, collection, getDocs, doc, getDoc, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+  import { firebaseConfig, SETTINGS as S } from "./config.js";
+  import { toKey, fromKey, addDays, nightsBetween, isPremium, rateFor, quote, MONTHS, fmtDate, rm, renderMonth, waNumber } from "./common.js";
+
+  const db = getFirestore(initializeApp(firebaseConfig));
+  const $ = (id) => document.getElementById(id);
+
+  // Paparan asas
+  document.title = `Tempahan ${S.homestayName}`;
+  $("hsName").textContent = S.homestayName;
+  $("hsLoc").textContent = S.location || "";
+  $("rateWd").textContent = rm(S.rateWeekday);
+  $("rateWe").textContent = rm(S.rateWeekend);
+  $("times").textContent = `Check-in ${S.checkInTime} · Check-out ${S.checkOutTime}`;
+  for (let i = 1; i <= S.maxGuests; i++) $("guests").add(new Option(`${i} orang`, i));
+
+  let booked = new Set();
+  let holidays = new Set();
+  let checkIn = null, checkOut = null;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const todayKey = toKey(today);
+  const firstMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+  let view = new Date(firstMonth);
+
+  async function loadAvailability() {
+    const [nights, settings] = await Promise.all([
+      getDocs(collection(db, "nights")),
+      getDoc(doc(db, "settings", "public")),
+    ]);
+    booked = new Set(nights.docs.map((d) => d.id));
+    holidays = new Set(settings.exists() ? settings.data().holidays || [] : []);
+  }
+
+  function draw() {
+    const y = view.getFullYear(), m = view.getMonth();
+    $("monthLabel").textContent = `${MONTHS[m]} ${y}`;
+    $("prev").disabled = view <= firstMonth;
+    const pickingOut = checkIn && !checkOut;
+    renderMonth($("cal"), y, m, (k) => {
+      const cls = [];
+      const past = k < todayKey;
+      if (past) return { cls: "past", disabled: true };
+      if (k === todayKey) cls.push("today");
+      const isBooked = booked.has(k);
+      // Tarikh penuh masih boleh dipilih sebagai tarikh check-out (keluar pagi itu)
+      const canBeCheckout = pickingOut && k > checkIn;
+      if (isBooked) cls.push("booked");
+      else if (isPremium(k, holidays)) cls.push("premium");
+      if (k === checkIn) cls.push("sel-start");
+      if (k === checkOut) cls.push("sel-end");
+      if (checkIn && checkOut && k > checkIn && k < checkOut) cls.push("in-range");
+      return {
+        cls: cls.join(" "),
+        sub: isBooked ? "penuh" : String(rateFor(k, holidays, S)),
+        disabled: isBooked && !canBeCheckout,
+        onClick: pick,
+      };
+    });
+    drawSummary();
+  }
+
+  function pick(k) {
+    if (!checkIn || checkOut || k <= checkIn) {
+      if (booked.has(k)) return;
+      checkIn = k; checkOut = null;
+    } else {
+      const nights = nightsBetween(checkIn, k);
+      if (nights.some((n) => booked.has(n))) {
+        alert("Ada tarikh yang sudah penuh di antara pilihan anda. Sila pilih tarikh lain.");
+        if (!booked.has(k)) { checkIn = k; checkOut = null; } else { checkIn = null; }
+      } else if (nights.length > S.maxNights) {
+        alert(`Maksimum ${S.maxNights} malam bagi tempahan online. Untuk tempoh lebih lama, sila WhatsApp kami.`);
+      } else {
+        checkOut = k;
+      }
+    }
+    $("hint").innerHTML = checkIn && !checkOut
+      ? "Sekarang tekan tarikh <b>check-out</b>."
+      : "Tekan tarikh <b>check-in</b>, kemudian tarikh <b>check-out</b>.";
+    draw();
+  }
+
+  function drawSummary() {
+    const box = $("summary");
+    if (!checkIn || !checkOut) { box.classList.add("hidden"); return; }
+    const q = quote(checkIn, checkOut, holidays, S);
+    const parts = [];
+    if (q.normal) parts.push(`${q.normal} × ${rm(S.rateWeekday)}`);
+    if (q.premium) parts.push(`${q.premium} × ${rm(S.rateWeekend)}`);
+    box.innerHTML = `
+      <div><b>Check-in:</b> ${fmtDate(checkIn, true)}</div>
+      <div><b>Check-out:</b> ${fmtDate(checkOut, true)}</div>
+      <div style="margin-top:6px">${q.nights.length} malam (${parts.join(" + ")})</div>
+      <div class="total">Anggaran: ${rm(q.total)}</div>`;
+    box.classList.remove("hidden");
+  }
+
+  $("prev").onclick = () => { view = new Date(view.getFullYear(), view.getMonth() - 1, 1); draw(); };
+  $("next").onclick = () => { view = new Date(view.getFullYear(), view.getMonth() + 1, 1); draw(); };
+
+  $("form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const err = $("formErr");
+    err.classList.add("hidden");
+    const name = $("name").value.trim();
+    const phone = $("phone").value.trim();
+    const guests = Number($("guests").value);
+    const fail = (m) => { err.textContent = m; err.classList.remove("hidden"); };
+    if (!checkIn || !checkOut) return fail("Sila pilih tarikh check-in dan check-out pada kalendar.");
+    if (!name) return fail("Sila isi nama.");
+    if (!/^[0-9+ -]{8,20}$/.test(phone)) return fail("Sila isi nombor telefon yang sah.");
+
+    const btn = $("submit");
+    btn.disabled = true; btn.textContent = "Menghantar…";
+    try {
+      await loadAvailability(); // semak semula supaya tarikh belum diambil orang lain
+      const q = quote(checkIn, checkOut, holidays, S);
+      if (q.nights.some((n) => booked.has(n))) {
+        checkIn = checkOut = null; draw();
+        return fail("Maaf, tarikh ini baru sahaja ditempah. Sila pilih tarikh lain.");
+      }
+      await addDoc(collection(db, "bookings"), {
+        name, phone, guests,
+        checkIn, checkOut,
+        nights: q.nights.length,
+        estPrice: q.total,
+        status: "pending",
+        createdAt: serverTimestamp(),
+      });
+      const msg = `Salam, saya ${name} baru buat tempahan ${S.homestayName}:\n` +
+        `Check-in: ${fmtDate(checkIn, true)}\nCheck-out: ${fmtDate(checkOut, true)}\n` +
+        `${q.nights.length} malam, ${guests} tetamu\nAnggaran: ${rm(q.total)}`;
+      $("doneText").textContent = `${fmtDate(checkIn)} – ${fmtDate(checkOut)} · ${q.nights.length} malam · anggaran ${rm(q.total)}. Tuan rumah akan menghubungi anda untuk pengesahan.`;
+      $("waBtn").href = `https://wa.me/${waNumber(S.whatsappNumber)}?text=${encodeURIComponent(msg)}`;
+      $("bookingView").classList.add("hidden");
+      $("doneView").classList.remove("hidden");
+      window.scrollTo(0, 0);
+    } catch (ex) {
+      console.error(ex);
+      fail("Tempahan gagal dihantar. Sila cuba lagi atau WhatsApp kami.");
+    } finally {
+      btn.disabled = false; btn.textContent = "Hantar tempahan";
+    }
+  });
+
+  $("again").onclick = () => location.reload();
+
+  loadAvailability()
+    .then(draw)
+    .catch((e) => { console.error(e); $("cal").innerHTML = '<p class="err">Kalendar gagal dimuatkan. Sila muat semula halaman.</p>'; });
+</script>
+</body>
+</html>

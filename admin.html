@@ -1,0 +1,521 @@
+<!doctype html>
+<html lang="ms">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex" />
+  <title>Admin Homestay</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div>
+      <h1 id="hsName">Admin</h1>
+      <div class="muted" id="who"></div>
+    </div>
+  </div>
+
+  <!-- LOGIN -->
+  <div id="loginView" class="card center hidden">
+    <h2>Log masuk admin</h2>
+    <p class="muted">Hanya akaun Google yang diberi akses boleh masuk.</p>
+    <button class="btn block" id="loginBtn">Log masuk dengan Google</button>
+    <div class="err hidden" id="loginErr"></div>
+  </div>
+
+  <!-- TIADA AKSES -->
+  <div id="deniedView" class="card center hidden">
+    <h2>Tiada akses</h2>
+    <p class="muted" id="deniedText"></p>
+    <button class="btn ghost block" id="logout2">Log keluar</button>
+  </div>
+
+  <!-- APP -->
+  <div id="appView" class="hidden">
+    <div class="tabs">
+      <button class="tab active" data-tab="cal">Kalendar</button>
+      <button class="tab" data-tab="list">Booking <span id="pendingCount"></span></button>
+      <button class="tab" data-tab="add">+ Tambah</button>
+      <button class="tab" data-tab="settings">Tetapan</button>
+    </div>
+
+    <!-- KALENDAR -->
+    <section data-panel="cal">
+      <div class="card">
+        <div class="cal-nav">
+          <button class="icon-btn" id="prev" aria-label="Bulan sebelum">‹</button>
+          <strong id="monthLabel"></strong>
+          <button class="icon-btn" id="next" aria-label="Bulan seterusnya">›</button>
+        </div>
+        <div id="cal"></div>
+        <div class="legend">
+          <span><i style="background:var(--pending)"></i>Pending</span>
+          <span><i style="background:var(--confirmed)"></i>Confirmed</span>
+          <span><i style="background:var(--paid)"></i>Paid</span>
+          <span><i style="background:#f3b3ad"></i>Bertindih</span>
+          <span><i style="background:var(--premium)"></i>Kadar RM250</span>
+        </div>
+      </div>
+      <div id="dayDetail"></div>
+    </section>
+
+    <!-- SENARAI -->
+    <section data-panel="list" class="hidden">
+      <div class="chips">
+        <button class="tab active" data-filter="upcoming">Akan datang</button>
+        <button class="tab" data-filter="pending">Pending</button>
+        <button class="tab" data-filter="all">Semua</button>
+        <button class="tab" data-filter="cancelled">Batal</button>
+      </div>
+      <div id="list"></div>
+    </section>
+
+    <!-- TAMBAH MANUAL -->
+    <section data-panel="add" class="hidden">
+      <form class="card" id="addForm">
+        <h2>Tambah booking manual</h2>
+        <p class="muted" style="margin:0">Untuk tempahan melalui WhatsApp / telefon.</p>
+        <div class="row">
+          <div><label>Check-in</label><input type="date" id="aIn" required /></div>
+          <div><label>Check-out</label><input type="date" id="aOut" required /></div>
+        </div>
+        <div class="summary hidden" id="aSummary"></div>
+        <label>Nama</label><input id="aName" maxlength="100" required />
+        <label>No. telefon</label><input id="aPhone" type="tel" maxlength="20" />
+        <div class="row">
+          <div><label>Tetamu</label><input id="aGuests" type="number" min="1" value="1" /></div>
+          <div><label>Status</label>
+            <select id="aStatus">
+              <option value="confirmed">Confirmed</option>
+              <option value="paid">Paid</option>
+              <option value="pending">Pending</option>
+            </select>
+          </div>
+        </div>
+        <label>Harga akhir (RM)</label><input id="aPrice" type="number" min="0" step="1" />
+        <label>Nota</label><textarea id="aNote" maxlength="500"></textarea>
+        <div class="err hidden" id="aErr"></div>
+        <button class="btn block" type="submit" id="aSubmit">Simpan booking</button>
+      </form>
+    </section>
+
+    <!-- TETAPAN -->
+    <section data-panel="settings" class="hidden">
+      <div class="card">
+        <h2>Link untuk customer</h2>
+        <input id="custLink" readonly />
+        <div class="bk-actions">
+          <button class="btn sm" id="copyLink">Salin link</button>
+          <a class="btn sm ghost" id="openLink" target="_blank" rel="noopener">Buka</a>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Cuti umum (kadar RM250)</h2>
+        <p class="muted" style="margin:0 0 8px">Tambah tarikh <b>malam</b> yang dikira kadar cuti. Contoh: cuti umum hari Rabu → tambah tarikh Rabu (dan malam sebelumnya jika mahu).</p>
+        <div class="row">
+          <input type="date" id="holDate" />
+          <input id="holName" placeholder="Nama (pilihan)" style="flex:1.2" />
+        </div>
+        <button class="btn sm" id="holAdd" style="margin-top:8px">Tambah</button>
+        <div id="holList" style="margin-top:10px"></div>
+      </div>
+
+      <div class="card">
+        <h2>Akses admin</h2>
+        <div id="adminList"><p class="muted">Memuatkan…</p></div>
+        <div id="ownerTools" class="hidden">
+          <label>Tambah admin (email akaun Google)</label>
+          <div class="row">
+            <input id="newAdmin" type="email" placeholder="nama@gmail.com" style="flex:2" />
+            <button class="btn sm" id="addAdmin">Tambah</button>
+          </div>
+          <p class="muted" style="font-size:.8rem">Admin boleh urus booking. Hanya owner boleh tambah/buang admin.</p>
+        </div>
+      </div>
+
+      <button class="btn ghost block" id="logout">Log keluar</button>
+    </section>
+  </div>
+</div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+  import {
+    getFirestore, collection, doc, getDoc, getDocs, setDoc, deleteDoc, onSnapshot, query, orderBy,
+    runTransaction, serverTimestamp, arrayUnion, arrayRemove,
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+  import { firebaseConfig, SETTINGS as S } from "./config.js";
+  import { toKey, nightsBetween, isPremium, quote, MONTHS, fmtDate, rm, renderMonth, esc, waNumber, toast } from "./common.js";
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+  const $ = (id) => document.getElementById(id);
+  const show = (id, on = true) => $(id).classList.toggle("hidden", !on);
+
+  $("hsName").textContent = `Admin · ${S.homestayName}`;
+  document.title = `Admin · ${S.homestayName}`;
+
+  const STATUS = { pending: "Pending", confirmed: "Confirmed", paid: "Paid", cancelled: "Batal" };
+  const BLOCKING = new Set(["confirmed", "paid"]);
+  const todayKey = toKey(new Date());
+
+  let me = null, myRole = null;
+  let bookings = [];               // semua booking
+  let byId = new Map();
+  let holidays = new Set();
+  let holidayNames = {};
+  let view = new Date(); view.setDate(1);
+  let selectedDay = null;
+  let filter = "upcoming";
+
+  // ---------------- LOGIN ----------------
+  $("loginBtn").onclick = async () => {
+    show("loginErr", false);
+    try {
+      const p = new GoogleAuthProvider();
+      p.setCustomParameters({ prompt: "select_account" });
+      await signInWithPopup(auth, p);
+    } catch (e) {
+      console.error(e);
+      $("loginErr").textContent = "Log masuk gagal: " + (e.code || e.message);
+      show("loginErr");
+    }
+  };
+  const doLogout = () => signOut(auth).then(() => location.reload());
+  $("logout").onclick = doLogout;
+  $("logout2").onclick = doLogout;
+
+  onAuthStateChanged(auth, async (user) => {
+    show("loginView", false); show("deniedView", false); show("appView", false);
+    if (!user) { $("who").textContent = ""; show("loginView"); return; }
+    me = user;
+    $("who").textContent = user.email;
+    const snap = await getDoc(doc(db, "admins", user.email.toLowerCase())).catch(() => null);
+    if (!snap || !snap.exists()) {
+      $("deniedText").textContent = `Akaun ${user.email} tiada akses admin. Minta owner tambah email ini.`;
+      show("deniedView");
+      return;
+    }
+    myRole = snap.data().role;
+    show("appView");
+    start();
+  });
+
+  // ---------------- DATA ----------------
+  function start() {
+    onSnapshot(query(collection(db, "bookings"), orderBy("checkIn")), (snap) => {
+      bookings = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      byId = new Map(bookings.map((b) => [b.id, b]));
+      const pend = bookings.filter((b) => b.status === "pending" && b.checkOut >= todayKey).length;
+      $("pendingCount").textContent = pend ? `(${pend})` : "";
+      refresh();
+    }, (e) => { console.error(e); toast("Gagal memuatkan booking: " + e.code); });
+
+    onSnapshot(doc(db, "settings", "public"), (snap) => {
+      const d = snap.exists() ? snap.data() : {};
+      holidays = new Set(d.holidays || []);
+      holidayNames = d.holidayNames || {};
+      drawHolidays();
+      refresh();
+    });
+
+    const base = location.href.replace(/admin\.html.*$/, "");
+    $("custLink").value = base;
+    $("openLink").href = base;
+    loadAdmins();
+  }
+
+  function refresh() {
+    drawCalendar();
+    drawDayDetail();
+    drawList();
+  }
+
+  // Transaksi: kemas kini booking + kunci/buka tarikh di koleksi "nights"
+  async function commit(ref, range, status, data, mode) {
+    const nights = nightsBetween(range.checkIn, range.checkOut);
+    await runTransaction(db, async (tx) => {
+      const refs = nights.map((k) => doc(db, "nights", k));
+      const snaps = await Promise.all(refs.map((r) => tx.get(r)));
+      const block = mode !== "delete" && BLOCKING.has(status);
+      if (block) {
+        snaps.forEach((s, i) => {
+          if (!s.exists() || s.data().bookingId === ref.id) return;
+          const other = byId.get(s.data().bookingId);
+          if (other && BLOCKING.has(other.status)) {
+            throw new Error(`${fmtDate(nights[i])} sudah ditempah oleh ${other.name}.`);
+          }
+        });
+        refs.forEach((r) => tx.set(r, { bookingId: ref.id }));
+      } else {
+        snaps.forEach((s, i) => { if (s.exists() && s.data().bookingId === ref.id) tx.delete(refs[i]); });
+      }
+      if (mode === "delete") tx.delete(ref);
+      else if (mode === "create") tx.set(ref, data);
+      else tx.update(ref, data);
+    });
+  }
+
+  // ---------------- KALENDAR ----------------
+  function activeOn(k) {
+    return bookings.filter((b) => b.status !== "cancelled" && b.checkIn <= k && k < b.checkOut);
+  }
+
+  function drawCalendar() {
+    const y = view.getFullYear(), m = view.getMonth();
+    $("monthLabel").textContent = `${MONTHS[m]} ${y}`;
+    renderMonth($("cal"), y, m, (k) => {
+      const list = activeOn(k);
+      const cls = [];
+      if (k === todayKey) cls.push("today");
+      if (list.length > 1) cls.push("s-conflict");
+      else if (list.length === 1) cls.push("s-" + list[0].status);
+      else if (isPremium(k, holidays)) cls.push("premium");
+      if (k === selectedDay) cls.push("sel-start");
+      const sub = list.length ? esc(list[0].name.split(" ")[0]) + (list.length > 1 ? "+" : "") : "";
+      return { cls: cls.join(" "), sub, onClick: (key) => { selectedDay = selectedDay === key ? null : key; drawCalendar(); drawDayDetail(); } };
+    });
+  }
+
+  function drawDayDetail() {
+    const box = $("dayDetail");
+    box.innerHTML = "";
+    if (!selectedDay) {
+      const up = bookings.filter((b) => b.status !== "cancelled" && b.checkOut >= todayKey).slice(0, 5);
+      const h = document.createElement("h2");
+      h.textContent = up.length ? "Akan datang" : "Tiada booking akan datang";
+      h.style.margin = "4px 0 10px";
+      box.appendChild(h);
+      up.forEach((b) => box.appendChild(card(b)));
+      return;
+    }
+    const list = bookings.filter((b) => b.checkIn <= selectedDay && selectedDay <= b.checkOut && b.status !== "cancelled");
+    const h = document.createElement("h2");
+    h.textContent = `${fmtDate(selectedDay, true)}${holidays.has(selectedDay) ? " · " + (holidayNames[selectedDay] || "Cuti umum") : ""}`;
+    h.style.margin = "4px 0 10px";
+    box.appendChild(h);
+    if (!list.length) {
+      const p = document.createElement("p");
+      p.className = "muted"; p.textContent = "Tiada booking pada tarikh ini.";
+      box.appendChild(p);
+    }
+    list.forEach((b) => box.appendChild(card(b)));
+  }
+
+  $("prev").onclick = () => { view = new Date(view.getFullYear(), view.getMonth() - 1, 1); drawCalendar(); };
+  $("next").onclick = () => { view = new Date(view.getFullYear(), view.getMonth() + 1, 1); drawCalendar(); };
+
+  // ---------------- KAD BOOKING ----------------
+  function card(b) {
+    const el = document.createElement("div");
+    el.className = "bk";
+    const created = b.createdAt?.toDate ? b.createdAt.toDate().toLocaleString("ms-MY") : "";
+    const overlap = b.status !== "cancelled" && nightsBetween(b.checkIn, b.checkOut).some((k) => activeOn(k).length > 1);
+    el.innerHTML = `
+      <div class="bk-head">
+        <div>
+          <div class="bk-name">${esc(b.name)}</div>
+          <div class="bk-meta">${fmtDate(b.checkIn)} → ${fmtDate(b.checkOut)} · ${b.nights} malam · ${esc(b.guests)} tetamu</div>
+          <div class="bk-meta">Anggaran ${rm(b.estPrice || 0)}${b.finalPrice != null ? ` · <b style="color:var(--ink)">Harga akhir ${rm(b.finalPrice)}</b>` : ""}</div>
+          ${b.note ? `<div class="bk-meta">📝 ${esc(b.note)}</div>` : ""}
+          ${overlap ? `<div class="err" style="margin-top:4px">⚠️ Bertindih dengan booking lain</div>` : ""}
+        </div>
+        <span class="badge ${b.status}">${STATUS[b.status] || esc(b.status)}</span>
+      </div>
+      <div class="bk-actions">
+        ${b.phone ? `<a class="btn sm wa" target="_blank" rel="noopener" href="https://wa.me/${waNumber(b.phone)}">WhatsApp</a>
+        <a class="btn sm ghost" href="tel:${esc(b.phone)}">${esc(b.phone)}</a>` : ""}
+        <button class="btn sm" data-act="edit">Urus</button>
+      </div>
+      <div class="edit hidden">
+        <div class="row">
+          <div><label>Status</label>
+            <select data-f="status">${Object.entries(STATUS).map(([v, t]) => `<option value="${v}" ${v === b.status ? "selected" : ""}>${t}</option>`).join("")}</select>
+          </div>
+          <div><label>Harga akhir (RM)</label>
+            <input data-f="price" type="number" min="0" step="1" value="${b.finalPrice ?? ""}" placeholder="${b.estPrice || ""}" />
+          </div>
+        </div>
+        <label>Nota</label>
+        <textarea data-f="note" maxlength="500">${esc(b.note || "")}</textarea>
+        <div class="muted" style="font-size:.78rem;margin-top:6px">Dihantar: ${created}${b.updatedBy ? ` · Dikemas kini oleh ${esc(b.updatedBy)}` : ""}</div>
+        <div class="bk-actions">
+          <button class="btn sm" data-act="save">Simpan</button>
+          <button class="btn sm danger" data-act="del">Padam</button>
+        </div>
+      </div>`;
+    const q = (s) => el.querySelector(s);
+    q('[data-act="edit"]').onclick = () => q(".edit").classList.toggle("hidden");
+    q('[data-act="save"]').onclick = async (ev) => {
+      const btn = ev.currentTarget;
+      const status = q('[data-f="status"]').value;
+      const priceRaw = q('[data-f="price"]').value.trim();
+      const data = {
+        status,
+        finalPrice: priceRaw === "" ? null : Number(priceRaw),
+        note: q('[data-f="note"]').value.trim(),
+        updatedAt: serverTimestamp(),
+        updatedBy: me.email,
+      };
+      btn.disabled = true;
+      try {
+        await commit(doc(db, "bookings", b.id), b, status, data, "update");
+        toast("Disimpan ✓");
+      } catch (e) { console.error(e); alert("Gagal simpan: " + e.message); }
+      finally { btn.disabled = false; }
+    };
+    q('[data-act="del"]').onclick = async () => {
+      if (!confirm(`Padam booking ${b.name} terus? (Lebih baik tukar status ke "Batal" untuk simpan rekod.)`)) return;
+      try { await commit(doc(db, "bookings", b.id), b, b.status, null, "delete"); toast("Dipadam"); }
+      catch (e) { console.error(e); alert("Gagal padam: " + e.message); }
+    };
+    return el;
+  }
+
+  // ---------------- SENARAI ----------------
+  function drawList() {
+    let list = bookings;
+    if (filter === "upcoming") list = list.filter((b) => b.status !== "cancelled" && b.checkOut >= todayKey);
+    else if (filter === "pending") list = list.filter((b) => b.status === "pending");
+    else if (filter === "cancelled") list = list.filter((b) => b.status === "cancelled");
+    if (filter === "all" || filter === "cancelled") list = [...list].reverse();
+    const box = $("list");
+    box.innerHTML = list.length ? "" : '<p class="muted">Tiada booking.</p>';
+    list.forEach((b) => box.appendChild(card(b)));
+  }
+  document.querySelectorAll("[data-filter]").forEach((btn) => btn.onclick = () => {
+    filter = btn.dataset.filter;
+    document.querySelectorAll("[data-filter]").forEach((x) => x.classList.toggle("active", x === btn));
+    drawList();
+  });
+
+  // ---------------- TAB ----------------
+  document.querySelectorAll("[data-tab]").forEach((btn) => btn.onclick = () => {
+    document.querySelectorAll("[data-tab]").forEach((x) => x.classList.toggle("active", x === btn));
+    document.querySelectorAll("[data-panel]").forEach((p) => p.classList.toggle("hidden", p.dataset.panel !== btn.dataset.tab));
+  });
+
+  // ---------------- TAMBAH MANUAL ----------------
+  function addQuote() {
+    const i = $("aIn").value, o = $("aOut").value;
+    if (!i || !o || o <= i) { show("aSummary", false); return null; }
+    const q = quote(i, o, holidays, S);
+    $("aSummary").innerHTML = `${q.nights.length} malam · anggaran <b>${rm(q.total)}</b>`;
+    show("aSummary");
+    $("aPrice").placeholder = q.total;
+    return q;
+  }
+  $("aIn").onchange = addQuote;
+  $("aOut").onchange = addQuote;
+
+  $("addForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const err = $("aErr");
+    show("aErr", false);
+    const q = addQuote();
+    const name = $("aName").value.trim();
+    if (!q) { err.textContent = "Sila pilih tarikh check-in dan check-out yang betul."; return show("aErr"); }
+    if (!name) { err.textContent = "Sila isi nama."; return show("aErr"); }
+    const priceRaw = $("aPrice").value.trim();
+    const status = $("aStatus").value;
+    const data = {
+      name,
+      phone: $("aPhone").value.trim(),
+      guests: Number($("aGuests").value) || 1,
+      checkIn: $("aIn").value,
+      checkOut: $("aOut").value,
+      nights: q.nights.length,
+      estPrice: q.total,
+      finalPrice: priceRaw === "" ? null : Number(priceRaw),
+      note: $("aNote").value.trim(),
+      status,
+      source: "manual",
+      createdAt: serverTimestamp(),
+      updatedBy: me.email,
+    };
+    const ref = doc(collection(db, "bookings"));
+    $("aSubmit").disabled = true;
+    try {
+      await commit(ref, data, status, data, "create");
+      toast("Booking ditambah ✓");
+      $("addForm").reset();
+      show("aSummary", false);
+    } catch (ex) {
+      console.error(ex);
+      err.textContent = "Gagal: " + ex.message;
+      show("aErr");
+    } finally { $("aSubmit").disabled = false; }
+  });
+
+  // ---------------- TETAPAN ----------------
+  $("copyLink").onclick = async () => {
+    try { await navigator.clipboard.writeText($("custLink").value); toast("Link disalin"); }
+    catch { $("custLink").select(); }
+  };
+
+  function drawHolidays() {
+    const box = $("holList");
+    const upcoming = [...holidays].sort().filter((k) => k >= todayKey);
+    box.innerHTML = upcoming.length ? "" : '<p class="muted">Belum ada cuti umum ditambah.</p>';
+    upcoming.forEach((k) => {
+      const row = document.createElement("div");
+      row.className = "list-item";
+      row.innerHTML = `<span>${fmtDate(k, true)}${holidayNames[k] ? ` · <span class="muted">${esc(holidayNames[k])}</span>` : ""}</span>`;
+      const b = document.createElement("button");
+      b.className = "btn sm danger"; b.textContent = "Buang";
+      b.onclick = () => setDoc(doc(db, "settings", "public"), { holidays: arrayRemove(k) }, { merge: true });
+      row.appendChild(b);
+      box.appendChild(row);
+    });
+  }
+  $("holAdd").onclick = async () => {
+    const k = $("holDate").value;
+    if (!k) return;
+    const name = $("holName").value.trim();
+    const upd = { holidays: arrayUnion(k) };
+    if (name) upd.holidayNames = { [k]: name };
+    await setDoc(doc(db, "settings", "public"), upd, { merge: true });
+    $("holDate").value = ""; $("holName").value = "";
+    toast("Cuti ditambah");
+  };
+
+  async function loadAdmins() {
+    const isOwner = myRole === "owner";
+    show("ownerTools", isOwner);
+    const snap = await getDocs(collection(db, "admins"));
+    const box = $("adminList");
+    box.innerHTML = "";
+    snap.docs.forEach((d) => {
+      const row = document.createElement("div");
+      row.className = "list-item";
+      row.innerHTML = `<span>${esc(d.id)} <span class="badge ${d.data().role === "owner" ? "paid" : "confirmed"}">${esc(d.data().role)}</span></span>`;
+      if (isOwner && d.data().role !== "owner") {
+        const b = document.createElement("button");
+        b.className = "btn sm danger"; b.textContent = "Buang";
+        b.onclick = async () => {
+          if (!confirm(`Buang akses ${d.id}?`)) return;
+          await deleteDoc(doc(db, "admins", d.id));
+          loadAdmins();
+        };
+        row.appendChild(b);
+      }
+      box.appendChild(row);
+    });
+  }
+  $("addAdmin").onclick = async () => {
+    const email = $("newAdmin").value.trim().toLowerCase();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return toast("Email tidak sah");
+    try {
+      await setDoc(doc(db, "admins", email), { role: "admin", addedBy: me.email, addedAt: serverTimestamp() });
+      $("newAdmin").value = "";
+      toast("Admin ditambah");
+      loadAdmins();
+    } catch (e) { console.error(e); alert("Gagal: " + e.message); }
+  };
+</script>
+</body>
+</html>
